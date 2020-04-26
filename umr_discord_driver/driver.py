@@ -6,7 +6,8 @@ from unified_message_relay.Core import UMRDriver
 from unified_message_relay.Core import UMRLogging
 from unified_message_relay.Core import UMRConfig
 from unified_message_relay.Core.UMRMessageRelation import set_ingress_message_id, set_egress_message_id
-from unified_message_relay.Util.Helper import check_attribute, unparse_entities_to_markdown, escape_markdown
+from unified_message_relay.Util.Helper import unparse_entities_to_markdown, escape_markdown
+from typing_extensions import Literal
 import discord
 import re
 
@@ -89,6 +90,15 @@ def find_markdown(text: str, text_start: int = 0, text_end=-1, real_start: int =
         text_start = outer_end
 
 
+class DiscordDriverConfig(UMRConfig.BaseDriverConfig):
+    Base: Literal['Discord']
+    BotToken: str
+    ClientToken: str
+
+
+UMRConfig.register_driver_config(DiscordDriverConfig)
+
+
 class DiscordDriver(UMRDriver.BaseDriverMixin, discord.Client):
     def __init__(self, name: str):
         self.loop = asyncio.new_event_loop()
@@ -98,19 +108,14 @@ class DiscordDriver(UMRDriver.BaseDriverMixin, discord.Client):
         self.name = name
         self.logger = UMRLogging.get_logger(self.name)
 
-        self.config = UMRConfig.config['Driver'].get(self.name)
-        attributes = [
-            ('BotToken', False, None),
-            ('ClientToken', True, '')
-        ]
-        check_attribute(self.config, attributes, self.logger)
+        self.config: DiscordDriverConfig = UMRConfig.config.Driver[self.name]
 
     def start(self):
         def run():
             nonlocal self
             self.logger.debug('Running start')
             asyncio.set_event_loop(self.loop)
-            self.run(self.config['BotToken'])
+            self.run(self.config.BotToken)
 
         t = threading.Thread(target=run)
         t.daemon = True
@@ -189,7 +194,7 @@ class DiscordDriver(UMRDriver.BaseDriverMixin, discord.Client):
                                          message_id=message.id)
 
         message_content = await self.parse_at(message.content)
-        unified_message.message, unified_message.message_entities = find_markdown(message_content.replace('\u200b', ''))
+        unified_message.text, unified_message.text_entities = find_markdown(message_content.replace('\u200b', ''))
 
         if message.attachments:
             if message.attachments[0].proxy_url:
@@ -281,7 +286,6 @@ class DiscordDriver(UMRDriver.BaseDriverMixin, discord.Client):
                                   dst_chat_type=chat_type,
                                   dst_message_id=outbound_message.id,  # useless message id
                                   user_id=0)
-
 
     def handle_exception(self, loop, context):
         # context["message"] will always be there; but context["exception"] may not
