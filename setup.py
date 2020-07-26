@@ -47,7 +47,7 @@ setup(
         "Typing :: Typed"
     ],
     install_requires=[
-        'discord',
+        'discord.py',
         'unified-message-relay',
         'janus'
     ],
